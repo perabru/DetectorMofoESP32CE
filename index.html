@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#090e19">
+  <meta name="description" content="MofoSense: dashboard em tempo real de temperatura, umidade e risco ambiental via ESP32-C3 e HiveMQ Cloud.">
+  <title>MofoSense • Monitoramento inteligente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root { color-scheme: dark; --bg:#090e19; --surface:#111a2a; --surface-2:#172237; --stroke:#253349; --muted:#91a0b6; --text:#eff5ff; --cyan:#65dbf3; --violet:#a49cff; --green:#5ce0b0; --red:#ff777f; --amber:#ffcb79; --sidebar:246px; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin:0; min-height:100vh; font: 14px/1.55 'DM Sans',system-ui,sans-serif; color:var(--text); background:radial-gradient(ellipse 65% 45% at 80% -10%,#172e44 0,transparent 70%),var(--bg); }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    button:focus-visible,input:focus-visible,a:focus-visible { outline:2px solid var(--cyan); outline-offset:3px; }
+    a { color:inherit; text-decoration:none; }
+    svg { display:block; }
+    .icon { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+    .app { display:flex; min-height:100vh; }
+    .sidebar { width:var(--sidebar); flex-shrink:0; position:sticky; height:100vh; top:0; display:flex; flex-direction:column; padding:32px 18px 22px; background:#0b1220eb; border-right:1px solid #1c2b3d; }
+    .brand { display:flex; align-items:center; gap:11px; padding:0 12px 39px; }
+    .brand-mark { width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:linear-gradient(135deg,#60dcf1,#6b7aff);color:#061a2a;box-shadow:0 8px 22px #46c8ec24; }
+    .brand-mark .icon { width:25px;height:25px;stroke-width:2.2; }
+    .brand strong { display:block;font:800 20px/1.15 Manrope,sans-serif;letter-spacing:-.9px; }
+    .brand small { color:var(--muted);font-size:10px;letter-spacing:2.2px;text-transform:uppercase; }
+    .nav-caption { padding:0 15px 10px;color:#71849f; font-size:10px;font-weight:800;letter-spacing:2px; }
+    .nav { display:grid;gap:5px; }
+    .nav a { display:flex;align-items:center;gap:13px;padding:12px 14px;border:1px solid transparent;border-radius:12px;color:#9dacc0;font-weight:600;transition:background .2s,color .2s; }
+    .nav a:hover,.nav a.active { color:#e9f8ff;background:#19283c;border-color:#293b51; }
+    .nav a.active .icon { color:var(--cyan); }
+    .nav .icon { width:18px;height:18px; }
+    .sidebar-bottom { margin-top:auto; }
+    .device-box { padding:17px 14px; border:1px solid var(--stroke);border-radius:16px;background:#131e2f; }
+    .device-box .overline { display:block;font-size:10px;letter-spacing:1.6px;color:#8394ac;font-weight:800;margin-bottom:10px; }
+    .device-box strong { display:block;font-size:14px; }
+    .device-box small { display:block;color:var(--muted);font-size:11px;margin-top:4px; }
+    .sidebar-foot { font-size:11px;color:#6d809a;padding:20px 9px 0; }
+    .main { min-width:0; flex:1; max-width:1770px;margin:0 auto; padding:31px clamp(20px,3.5vw,58px) 44px; }
+    .topbar { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:29px; }
+    .eyebrow { color:var(--muted); font-weight:800;letter-spacing:2px;text-transform:uppercase;font-size:10px; }
+    .page-title { margin:2px 0 0;font:800 clamp(22px,2.5vw,29px)/1.3 Manrope,sans-serif;letter-spacing:-1px; }
+    .top-actions { display:flex;gap:11px;align-items:center;flex-wrap:wrap; }
+    .chip { display:inline-flex;align-items:center;gap:9px;min-height:39px;padding:0 13px;border:1px solid var(--stroke);background:#131e2dbd;border-radius:50px;color:#b4c3d8;font-weight:700;font-size:12px;white-space:nowrap; }
+    .dot { width:8px;height:8px;display:inline-block;border-radius:50%;background:#8090a6;box-shadow:0 0 0 4px #8291a51a; }
+    .dot.ok { background:var(--green);box-shadow:0 0 0 4px #5ce0b01c; }
+    .dot.bad { background:var(--red);box-shadow:0 0 0 4px #ff777f1b; }
+    .dot.demo { background:var(--amber);box-shadow:0 0 0 4px #ffcb791c; }
+    .btn { display:inline-flex;justify-content:center;align-items:center;gap:8px;border:1px solid #33465f;background:#1b2a3f;color:var(--text);padding:11px 16px;border-radius:11px;font-weight:800;font-size:12px;transition:transform .2s,background .2s; }
+    .btn:hover { transform:translateY(-1px);background:#253954; }
+    .btn-primary { border:1px solid #61d3ea;background:linear-gradient(120deg,#65dced,#83b9ff);color:#08212d;box-shadow:0 6px 22px #52cfde20; }
+    .btn-primary:hover { background:linear-gradient(120deg,#90eefa,#a1cbff); }
+    .btn-quiet { background:transparent;border-color:var(--stroke);color:#aebcd0; }
+    .hero { position:relative;min-height:220px;display:flex;justify-content:space-between;align-items:center;gap:18px;overflow:hidden;border:1px solid #28415a;border-radius:22px;padding:32px clamp(24px,3.5vw,44px);background:radial-gradient(circle at 81% 42%,#24526a 0,transparent 30%),linear-gradient(115deg,#182b40,#102338 65%,#142d3c); }
+    .hero:after { content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,transparent 0 79%,#8ae9ff08 79% 79.15%,transparent 79.15%); }
+    .hero-copy { position:relative;z-index:1;max-width:570px; }
+    .hero-kicker { display:inline-flex;align-items:center;gap:7px;color:#93e7ec;letter-spacing:2px;font-size:10px;font-weight:800;text-transform:uppercase; }
+    .hero h2 { font:800 clamp(24px,3vw,39px)/1.22 Manrope,sans-serif;letter-spacing:-1.6px;margin:12px 0; }
+    .hero p { color:#adbed0;max-width:490px;margin:0;line-height:1.8; }
+    .hero-art { position:relative;width:200px;height:170px;flex-shrink:0;display:grid;place-items:center; }
+    .orbit { position:absolute;border:1px solid #9de5f01f;border-radius:50%; }
+    .orbit.o1 { width:160px;height:160px; }.orbit.o2{ width:118px;height:118px;border-color:#9de5f03a; }.orbit.o3{ width:77px;height:77px;border-color:#9de5f05c; }
+    .hero-center { width:58px;height:58px;display:grid;place-items:center;background:#4fcfe51a;border:1px solid #68e2f085;box-shadow:0 0 55px #3ecbe83b;border-radius:50%;color:#a6efff; }
+    .hero-center .icon { width:29px;height:29px; }.orbit-dot { position:absolute;right:28px;top:32px;width:11px;height:11px;background:#66dce9;border-radius:50%;box-shadow:0 0 22px #6feaff; }
+    .section-heading { display:flex;justify-content:space-between;align-items:center;gap:10px;margin:29px 0 14px; }
+    .section-heading h3 { font:800 17px Manrope,sans-serif;letter-spacing:-.35px;margin:0; }
+    .section-heading span { color:var(--muted);font-size:12px; }
+    .metrics { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px; }
+    .panel { border:1px solid var(--stroke);background:linear-gradient(160deg,#142033,#101a2a);border-radius:18px;min-width:0; }
+    .metric { padding:22px 24px;min-height:188px;position:relative;overflow:hidden; }
+    .metric:before { position:absolute;right:-54px;top:-74px;content:'';width:180px;height:180px;border-radius:50%;background:#4d89af10;pointer-events:none; }
+    .metric-head { display:flex;align-items:center;justify-content:space-between;gap:10px;color:#aab9ce;font-weight:700;font-size:13px; }
+    .metric-icon { display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:#1b4256;color:var(--cyan); }
+    .metric-icon.purple { background:#332b53;color:#b9a6ff; }.metric-icon.green{background:#1c453c;color:var(--green)}
+    .metric-value { font:800 clamp(30px,3.2vw,44px)/1.3 Manrope,sans-serif;letter-spacing:-1.7px;margin:13px 0 5px; }
+    .unit { font-size:17px;color:#95a6bb;font-weight:700;letter-spacing:0; }.metric-sub { color:var(--muted);font-size:12px; }.metric-sub strong{font-weight:800;color:#c4d9ed; }
+    .meter { width:100%;height:5px;background:#24354b;border-radius:40px;overflow:hidden;margin-top:21px; }.meter>span { display:block;height:100%;width:0;background:linear-gradient(90deg,#5dc6e1,#62ecdc);border-radius:inherit;transition:width .5s; }
+    #umid-meter { background:linear-gradient(90deg,#9996fb,#d4a5f8); }
+    .risk-value { font-size:29px;margin-top:17px;letter-spacing:-1px; }.risk-card.risk { border-color:#a9545c;background:linear-gradient(145deg,#30232e,#171d2a); }.risk-card.risk .risk-value {color:var(--red)}.risk-card.safe .risk-value{color:var(--green)}.risk-card.error .risk-value{color:var(--amber)}
+    .charts-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px; }
+    .chart-card { padding:22px 23px 18px; }.chart-top { display:flex;justify-content:space-between;align-items:start;gap:8px; }.chart-title { font:800 15px Manrope,sans-serif;margin:0; }.chart-desc { color:var(--muted);margin:4px 0 0;font-size:11px; }
+    .chart-value { font:800 23px Manrope,sans-serif;letter-spacing:-.8px;white-space:nowrap; }.chart-value.cyan{color:var(--cyan)}.chart-value.purple{color:#b9a6ff}
+    .chart { width:100%;height:177px;margin-top:19px;overflow:visible; }.chart text { fill:#71849d;font:11px 'DM Sans',sans-serif; }.chart .gridline { stroke:#2a3a50;stroke-width:1;stroke-dasharray:3 5; }.chart .stroke-line { fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round; }.chart .point { stroke:#101a2a;stroke-width:2; }.chart .empty { fill:#8b9fb7;font-size:13px; }
+    .range { display:flex;align-items:center;gap:3px;border:1px solid var(--stroke);padding:3px;border-radius:10px;background:#121d2c; }.range button {border:0;background:transparent;color:#8b9eb6;padding:6px 10px;border-radius:7px;font-size:11px;font-weight:800;}.range button.selected{color:#dcf4fa;background:#2a4257;}
+    .lower-grid { display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:15px; }.inner { padding:23px; }.card-title { margin:0 0 5px;font:800 16px Manrope,sans-serif; }.small-description { color:var(--muted);font-size:12px;margin:0; }
+    .info-line {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0;border-bottom:1px solid #253449; }.info-line:last-child{border-bottom:0;padding-bottom:0;}.info-line .left{display:flex;align-items:center;gap:11px;}.small-icon { width:37px;height:37px;border-radius:10px;display:grid;place-items:center;background:#1d3145;color:#a9cfe2; }.small-icon .icon{width:18px;height:18px;}.info-line strong {display:block;font-size:13px;}.info-line small {display:block;color:var(--muted);font-size:11px;margin-top:2px;}.info-line .right{color:#cfe1ee;font-weight:800;text-align:right;font-size:12px;}.badge {display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:40px;background:#28364a;color:#aebcd0;font-weight:800;font-size:11px;white-space:nowrap;}.badge.red{background:#562f39;color:#ff9fa5;}.badge.green{background:#19483e;color:#78f5c1;}.badge.amber{background:#4e3d2a;color:#ffe09d;}
+    .events {list-style:none;padding:6px 0 0;margin:0;display:grid;gap:0;}.events li{display:flex;gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid #243146;}.events li:last-child{border:0;}.event-dot{width:9px;height:9px;border-radius:50%;background:#6ca5bc;flex-shrink:0;margin-top:6px;}.event-dot.red{background:var(--red)}.event-dot.green{background:var(--green)}.event-dot.amber{background:var(--amber)}.event-description{display:block;font-weight:700;font-size:12px;}.event-time{display:block;color:var(--muted);font-size:11px;margin-top:3px;}.events-placeholder{color:var(--muted);font-size:12px;padding-top:24px;}
+    .footer {display:flex;align-items:center;justify-content:space-between;gap:15px;color:#7b8ba2;font-size:11px;margin-top:30px;flex-wrap:wrap;}.footer strong{color:#9eafc5;}.footer-actions{display:flex;gap:8px;flex-wrap:wrap;}.footer-actions .btn{padding:8px 11px;font-size:11px;}
+    .modal-backdrop {position:fixed;z-index:20;inset:0;background:#030713c9;backdrop-filter:blur(11px);display:none;align-items:center;justify-content:center;padding:18px;}.modal-backdrop.open{display:flex;}.modal{width:min(100%,460px);padding:28px;border-radius:22px;border:1px solid #36506a;background:#142236;box-shadow:0 24px 120px #000a;}.modal-top{display:flex;justify-content:space-between;align-items:start;gap:12px;}.modal h2{font:800 24px Manrope,sans-serif;letter-spacing:-1px;margin:7px 0 7px;}.modal p{color:var(--muted);font-size:12px;line-height:1.7;margin:0 0 20px;}.close{background:#24364b;color:#bed2e4;border:1px solid #36516b;border-radius:9px;width:32px;height:32px;font-size:19px;line-height:1;}.field{display:grid;gap:7px;margin-bottom:13px;}.field label{font-size:12px;font-weight:800;color:#b8cce0;}.field input{width:100%;background:#0d1727;color:var(--text);border:1px solid #30465f;border-radius:11px;padding:12px 13px;outline:0;}.field input:focus{border-color:#63dcec;box-shadow:0 0 0 3px #63dcec16;}.field small{color:#8499ae;font-size:10px;overflow-wrap:anywhere;}.modal .btn{width:100%;margin-top:7px;}.modal-hint{margin-top:15px;padding:12px;border-radius:10px;background:#0e1a2b;color:#95a9bf;font-size:11px;}.status-message{min-height:18px;color:#fcaab1;font-size:11px;margin:6px 0 0;}.toast{position:fixed;z-index:25;right:24px;bottom:22px;max-width:min(390px,calc(100vw - 32px));padding:13px 17px;border-radius:12px;border:1px solid #36506b;background:#1a2a40;color:#eff6ff;box-shadow:0 14px 42px #0008;opacity:0;transform:translateY(12px);pointer-events:none;transition:.25s;}.toast.visible{opacity:1;transform:translateY(0);}
+    @media(max-width:1050px){.sidebar{width:72px;padding:26px 10px}.brand{padding:0 4px 35px;justify-content:center}.brand-name,.nav-caption,.nav a span,.sidebar-bottom,.sidebar-foot{display:none}.nav a{justify-content:center;padding:13px}.main{padding:25px 24px 40px}.hero-art{width:145px}.metrics{gap:10px}.metric{padding:17px}.metric-value{font-size:33px}}
+    @media(max-width:720px){.app{display:block}.sidebar{position:sticky;z-index:8;top:0;width:100%;height:auto;flex-direction:row;padding:10px 16px;background:#0c1625f2;border-right:0;border-bottom:1px solid #273449;align-items:center;justify-content:space-between}.brand{padding:0;gap:7px}.brand-mark{width:35px;height:35px}.brand-name{display:block}.brand strong{font-size:16px}.brand small{display:none}.nav{display:flex;gap:3px}.nav a{padding:9px}.nav a .icon{width:17px;height:17px}.main{padding:20px 15px 32px}.topbar{align-items:flex-start;flex-wrap:wrap;margin-bottom:20px}.top-actions{width:100%;justify-content:space-between}.hero{padding:26px 23px;min-height:230px}.hero-art{position:absolute;right:-51px;opacity:.34}.hero-copy{max-width:90%}.hero p{font-size:12px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{padding:17px;min-height:169px}.risk-card{grid-column:1/-1;min-height:150px}.metric-value{font-size:30px}.charts-grid,.lower-grid{grid-template-columns:1fr}.chart-card,.inner{padding:19px}.section-heading{align-items:flex-start;flex-wrap:wrap}.range{margin-top:3px}}
+    @media(max-width:370px){.brand strong{font-size:14px}.nav a{padding:7px}.metric{padding:13px}.metric-head{font-size:11px}.metric-value{font-size:26px}.top-actions .btn{padding:10px}.hero-copy{max-width:100%}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition-duration:.01ms!important;animation-duration:.01ms!important}}
+  </style>
+</head>
+<body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></symbol>
+    <symbol id="i-thermo" viewBox="0 0 24 24"><path d="M14 14.8V5a3 3 0 0 0-6 0v9.8a5 5 0 1 0 6 0Z"/><path d="M11 10v8"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3c-3 4-7 8.3-7 12a7 7 0 0 0 14 0c0-3.7-4-8-7-12Z"/><path d="M8.5 15.5a3.5 3.5 0 0 0 3.5 3.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 2 9 4v6c0 5-3.5 8.5-9 10-5.5-1.5-9-5-9-10V6l9-4Z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8.5 16a6 6 0 0 1 7 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M9 1v4m6-4v4M9 19v4m6-4v4M1 9h4m-4 6h4m14-6h4m-4 6h4"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M8 15c-1.5-1.3-3-3.1-3-6a7 7 0 0 1 14 0c0 2.9-1.5 4.7-3 6-.8.7-1 1.7-1 3H9c0-1.3-.2-2.3-1-3Z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="m10 13 4-4M8 16H6a4 4 0 0 1 0-8h4M14 8h4a4 4 0 0 1 0 8h-4"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  </svg>
+  <div class="app">
+    <aside class="sidebar" aria-label="Navegação">
+      <a class="brand" href="#inicio"><span class="brand-mark"><svg class="icon"><use href="#i-drop"/></svg></span><span class="brand-name"><strong>mofo<span style="color:var(--cyan)">sense.</span></strong><small>Smart environment</small></span></a>
+      <div class="nav-caption">MENU PRINCIPAL</div>
+      <nav class="nav">
+        <a class="active" href="#inicio"><svg class="icon"><use href="#i-grid"/></svg><span>Visão geral</span></a>
+        <a href="#graficos"><svg class="icon"><use href="#i-pulse"/></svg><span>Gráficos</span></a>
+        <a href="#dispositivos"><svg class="icon"><use href="#i-cpu"/></svg><span>Dispositivos</span></a>
+        <a href="#eventos"><svg class="icon"><use href="#i-clock"/></svg><span>Histórico</span></a>
+      </nav>
+      <div class="sidebar-bottom"><div class="device-box"><span class="overline">DISPOSITIVO</span><strong>ESP32-C3</strong><small>DHT11 · Temperatura e umidade</small><div style="display:flex;align-items:center;gap:8px;margin-top:17px"><span id="side-dot" class="dot"></span><small id="side-state" style="margin:0">Aguardando conexão</small></div></div><div class="sidebar-foot">MofoSense • Painel IoT</div></div>
+    </aside>
+    <main class="main" id="inicio">
+      <header class="topbar"><div><div class="eyebrow">Monitoramento ambiental / ESP32-C3</div><h1 class="page-title">Visão geral</h1></div><div class="top-actions"><span class="chip"><span id="conn-dot" class="dot"></span><span id="conn-label">Desconectado</span></span><button id="demo-btn" class="btn btn-quiet" type="button">Testar visual</button><button id="connect-btn" class="btn btn-primary" type="button"><svg class="icon" style="width:16px;height:16px"><use href="#i-link"/></svg><span id="connect-label">Conectar HiveMQ</span></button></div></header>
+      <section class="hero" aria-label="Resumo do ambiente"><div class="hero-copy"><div class="hero-kicker"><span class="dot ok" style="width:6px;height:6px"></span> INTELIGÊNCIA AMBIENTAL</div><h2>Um ambiente mais saudável começa pelos dados.</h2><p>Acompanhe temperatura, umidade e condições favoráveis ao mofo em um único lugar. Alertas em tempo real, sem complicação.</p></div><div class="hero-art" aria-hidden="true"><div class="orbit o1"></div><div class="orbit o2"></div><div class="orbit o3"></div><div class="orbit-dot"></div><div class="hero-center"><svg class="icon"><use href="#i-pulse"/></svg></div></div></section>
+      <div class="section-heading"><h3>Indicadores em tempo real</h3><span id="last-update" aria-live="polite">Aguardando dados da ESP32-C3</span></div>
+      <section class="metrics" aria-label="Indicadores do ambiente">
+        <article class="panel metric"><div class="metric-head"><span>Temperatura</span><span class="metric-icon"><svg class="icon"><use href="#i-thermo"/></svg></span></div><div class="metric-value"><span id="temp-value">--</span> <span class="unit">°C</span></div><div class="metric-sub" id="temp-detail">Aguardando a primeira leitura</div><div class="meter"><span id="temp-meter"></span></div></article>
+        <article class="panel metric"><div class="metric-head"><span>Umidade relativa</span><span class="metric-icon purple"><svg class="icon"><use href="#i-drop"/></svg></span></div><div class="metric-value"><span id="humidity-value">--</span> <span class="unit">%</span></div><div class="metric-sub" id="humidity-detail">Aguardando a primeira leitura</div><div class="meter"><span id="umid-meter"></span></div></article>
+        <article class="panel metric risk-card" id="risk-card"><div class="metric-head"><span>Condição do ambiente</span><span class="metric-icon green"><svg class="icon"><use href="#i-shield"/></svg></span></div><div class="metric-value risk-value" id="risk-value">Aguardando</div><div class="metric-sub" id="risk-detail">Sem classificação recebida</div></article>
+      </section>
+      <div class="section-heading" id="graficos"><h3>Evolução das leituras</h3><div class="range" role="group" aria-label="Período dos gráficos"><button data-minutes="15" class="selected" type="button">15 min</button><button data-minutes="60" type="button">1 h</button><button data-minutes="360" type="button">6 h</button><button data-minutes="1440" type="button">24 h</button></div></div>
+      <section class="charts-grid" aria-label="Gráficos de histórico">
+        <article class="panel chart-card"><div class="chart-top"><div><h4 class="chart-title">Temperatura</h4><p class="chart-desc">Variação em graus Celsius</p></div><strong class="chart-value cyan" id="chart-temp">-- °C</strong></div><svg id="temp-chart" class="chart" viewBox="0 0 560 175" preserveAspectRatio="none" role="img" aria-label="Histórico de temperatura"><text class="empty" x="280" y="88" text-anchor="middle">As leituras aparecerão aqui</text></svg></article>
+        <article class="panel chart-card"><div class="chart-top"><div><h4 class="chart-title">Umidade</h4><p class="chart-desc">Umidade relativa do ar</p></div><strong class="chart-value purple" id="chart-humidity">-- %</strong></div><svg id="humidity-chart" class="chart" viewBox="0 0 560 175" preserveAspectRatio="none" role="img" aria-label="Histórico de umidade"><text class="empty" x="280" y="88" text-anchor="middle">As leituras aparecerão aqui</text></svg></article>
+      </section>
+      <div class="section-heading"><h3>Detalhes e atividade</h3><span>Atualização automática enquanto conectado</span></div>
+      <section class="lower-grid"><article class="panel inner" id="dispositivos"><h4 class="card-title">Dispositivo e sensores</h4><p class="small-description">Estado dos componentes e da comunicação</p>
+        <div class="info-line"><div class="left"><span class="small-icon"><svg class="icon"><use href="#i-cpu"/></svg></span><div><strong>ESP32-C3 · DHT11</strong><small>Sensor no GPIO 10</small></div></div><span class="badge" id="device-badge">Aguardando</span></div>
+        <div class="info-line"><div class="left"><span class="small-icon"><svg class="icon"><use href="#i-bulb"/></svg></span><div><strong>LED vermelho</strong><small>Alerta de risco · GPIO 3</small></div></div><span class="badge" id="red-badge">--</span></div>
+        <div class="info-line"><div class="left"><span class="small-icon"><svg class="icon"><use href="#i-bulb"/></svg></span><div><strong>LED verde</strong><small>Sem alerta · GPIO 2</small></div></div><span class="badge" id="green-badge">--</span></div>
+        <div class="info-line"><div class="left"><span class="small-icon"><svg class="icon"><use href="#i-wifi"/></svg></span><div><strong>HiveMQ Cloud</strong><small>WebSocket seguro · porta 8884</small></div></div><span class="badge" id="mqtt-badge">Desconectado</span></div>
+      </article><article class="panel inner" id="eventos"><h4 class="card-title">Atividade recente</h4><p class="small-description">Últimos eventos desta sessão</p><ul class="events" id="event-list"><li class="events-placeholder">Conecte-se ao HiveMQ para acompanhar os eventos.</li></ul></article></section>
+      <footer class="footer"><div><strong>MofoSense</strong> · Indicador ambiental, não detector direto de mofo. O histórico fica apenas nesta aba.</div><div class="footer-actions"><button id="export-btn" class="btn btn-quiet" type="button"><svg class="icon" style="width:15px;height:15px"><use href="#i-download"/></svg> Exportar CSV</button><button id="clear-btn" class="btn btn-quiet" type="button">Limpar gráficos</button></div></footer>
+    </main>
+  </div>
+  <div class="modal-backdrop" id="modal" role="presentation"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-top"><div><div class="eyebrow">CONEXÃO SEGURA</div><h2 id="modal-title">Conectar ao HiveMQ</h2></div><button class="close" type="button" id="close-modal" aria-label="Fechar janela">×</button></div><p>O endereço do broker já está configurado. Informe as credenciais para receber os dados da ESP32-C3.</p><form id="connect-form" autocomplete="off"><div class="field"><label for="broker-field">Broker MQTT</label><input id="broker-field" value="125e4c5cf1a84e15a472be4cda4c9761.s1.eu.hivemq.cloud" readonly><small>Conexão: wss://…:8884/mqtt · Assinatura: perabru/mofo/#</small></div><div class="field"><label for="user-field">Usuário</label><input id="user-field" value="perabru" autocomplete="username" required></div><div class="field"><label for="password-field">Senha do HiveMQ</label><input id="password-field" type="password" autocomplete="off" placeholder="Digite a senha do broker" required></div><div class="status-message" id="form-status" role="status"></div><button type="submit" class="btn btn-primary">Conectar e acompanhar dados</button></form><div class="modal-hint">🔒 A senha não é gravada no HTML, no armazenamento local nem no histórico. Ela permanece na memória do navegador apenas durante a conexão.</div></div></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <!-- Biblioteca MQTT.js para navegador. O restante do site está integralmente neste HTML. -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+  (() => {
+    'use strict';
+    const BROKER = '125e4c5cf1a84e15a472be4cda4c9761.s1.eu.hivemq.cloud';
+    const WS_URL = `wss://${BROKER}:8884/mqtt`;
+    const PREFIX = 'perabru/mofo/';
+    const TOPICS = ['temperatura','umidade','risco','led_vermelho','led_verde','status'];
+    const $ = id => document.getElementById(id);
+    const el = {
+      modal:$('modal'),form:$('connect-form'),password:$('password-field'),username:$('user-field'),formStatus:$('form-status'),
+      connDot:$('conn-dot'),connLabel:$('conn-label'),sideDot:$('side-dot'),sideState:$('side-state'),connectLabel:$('connect-label'),
+      temp:$('temp-value'),humidity:$('humidity-value'),risk:$('risk-value'),riskDetail:$('risk-detail'),riskCard:$('risk-card'),
+      tempDetail:$('temp-detail'),humidityDetail:$('humidity-detail'),tempMeter:$('temp-meter'),humidMeter:$('umid-meter'),
+      lastUpdate:$('last-update'),chartTemp:$('chart-temp'),chartHumid:$('chart-humidity'),tempChart:$('temp-chart'),humidChart:$('humidity-chart'),
+      redBadge:$('red-badge'),greenBadge:$('green-badge'),deviceBadge:$('device-badge'),mqttBadge:$('mqtt-badge'),events:$('event-list'),toast:$('toast')
+    };
+    let client = null, demoTimer = null, toastTimer = null, selectedMinutes = 15;
+    let history = [], events = [];
+    const state = { mode:'offline', connected:false, temperature:null, humidity:null, risk:null, red:null, green:null, device:'unknown', freshAt:null, retained:false };
+    const MAX_POINTS = 1800;
+
+    function showToast(message) {
+      el.toast.textContent = message; el.toast.classList.add('visible');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => el.toast.classList.remove('visible'), 3800);
+    }
+    function addEvent(message, type='normal') {
+      events.unshift({message,type,time:new Date()}); events = events.slice(0,7);
+      el.events.replaceChildren();
+      events.forEach(item => {
+        const li=document.createElement('li'),dot=document.createElement('span'),body=document.createElement('div'),desc=document.createElement('span'),when=document.createElement('span');
+        dot.className='event-dot'+(item.type==='risk'?' red':item.type==='safe'?' green':item.type==='warning'?' amber':'');
+        desc.className='event-description';desc.textContent=item.message;when.className='event-time';when.textContent=item.time.toLocaleTimeString('pt-BR');
+        body.append(desc,when);li.append(dot,body);el.events.append(li);
+      });
+    }
+    function setConnection(mode,label) {
+      state.mode=mode; state.connected=mode==='online';
+      [el.connDot,el.sideDot].forEach(dot=>{dot.className='dot'+(mode==='online'?' ok':mode==='demo'?' demo':mode==='error'?' bad':'');});
+      el.connLabel.textContent=label;el.sideState.textContent=label;
+      el.connectLabel.textContent=mode==='online'?'Desconectar':'Conectar HiveMQ';
+      el.mqttBadge.textContent=mode==='online'?'Conectado':mode==='demo'?'Demonstração':label;
+      el.mqttBadge.className='badge'+(mode==='online'?' green':mode==='demo'?' amber':'');
+      refreshDevice();
+    }
+    function refreshDevice() {
+      const age = state.freshAt===null ? Infinity : Date.now()-state.freshAt;
+      let label='Aguardando',style='';
+      if(state.mode==='demo'){label='Simulação';style='amber';}
+      else if(state.device==='offline'){label='Offline';style='red';}
+      else if(state.device==='error'){label='Falha sensor';style='amber';}
+      else if(state.connected && age<30000){label='Ao vivo';style='green';}
+      else if(state.connected && state.freshAt!==null){label='Sem dados recentes';style='amber';}
+      else if(state.connected){label='Aguardando dados';}
+      else if(state.device==='online'){label='Último estado: online';}
+      el.deviceBadge.className='badge'+(style?' '+style:'');el.deviceBadge.textContent=label;
+      if(state.freshAt!==null) {
+        const t=new Date(state.freshAt).toLocaleTimeString('pt-BR');
+        el.lastUpdate.textContent=(state.mode==='demo'?'Simulação · ':'Última leitura ao vivo às ')+t+(state.mode==='demo'?'':age>=30000?' · dados desatualizados':'');
+      } else if(state.retained) el.lastUpdate.textContent='Valores retidos pelo broker · aguardando leitura ao vivo';
+      else el.lastUpdate.textContent='Aguardando dados da ESP32-C3';
+    }
+    function setBadge(element, value, isRed) {
+      const active=value==='ON';element.textContent=value===null?'--':active?'ACESO':'APAGADO';
+      element.className='badge'+(value===null?'':active?' '+(isRed?'red':'green'):'');
+    }
+    function renderMetrics() {
+      el.temp.textContent=state.temperature===null?'--':state.temperature.toFixed(1).replace('.',',');
+      el.humidity.textContent=state.humidity===null?'--':state.humidity.toFixed(1).replace('.',',');
+      el.chartTemp.textContent=state.temperature===null?'-- °C':state.temperature.toFixed(1).replace('.',',')+' °C';
+      el.chartHumid.textContent=state.humidity===null?'-- %':state.humidity.toFixed(1).replace('.',',')+' %';
+      el.tempDetail.textContent=state.temperature===null?'Aguardando a primeira leitura': 'Medido pelo sensor DHT11';
+      el.humidityDetail.textContent=state.humidity===null?'Aguardando a primeira leitura':state.humidity>=70?'Umidade elevada':state.humidity>=65?'Umidade moderadamente elevada':'Umidade abaixo de 65%';
+      el.tempMeter.style.width=state.temperature===null?'0%':Math.max(0,Math.min(100,state.temperature/50*100))+'%';
+      el.humidMeter.style.width=state.humidity===null?'0%':Math.max(0,Math.min(100,state.humidity))+'%';
+      el.riskCard.classList.remove('safe','risk','error');
+      if(state.device==='error'||state.risk==='ERRO'){el.risk.textContent='Erro de leitura';el.riskDetail.textContent='Verifique o sensor DHT11';el.riskCard.classList.add('error');}
+      else if(state.risk==='RISCO'){el.risk.textContent='Atenção';el.riskDetail.textContent='Condições favoráveis ao mofo · alerta da ESP32';el.riskCard.classList.add('risk');}
+      else if(state.risk==='SEGURO'){el.risk.textContent='Sem alerta';el.riskDetail.textContent='Abaixo dos limites do protótipo';el.riskCard.classList.add('safe');}
+      else {el.risk.textContent='Aguardando';el.riskDetail.textContent='Sem classificação recebida';}
+      setBadge(el.redBadge,state.red,true);setBadge(el.greenBadge,state.green,false);refreshDevice();
+    }
+    function addPoint(at=Date.now()) {
+      if(state.temperature===null||state.humidity===null)return;
+      history.push({at,temperature:state.temperature,humidity:state.humidity});
+      if(history.length>MAX_POINTS)history.shift();renderCharts();
+    }
+    function plot(svg,field,color,fillId,baseMin,baseMax) {
+      const now=Date.now(),from=now-selectedMinutes*60000;
+      const values=history.filter(row=>row.at>=from&&row.at<=now+2000&&Number.isFinite(row[field]));
+      const W=560,H=175,L=40,R=12,T=12,B=31,plotW=W-L-R,plotH=H-T-B;
+      const rangeVals=values.map(v=>v[field]);
+      let yMin=rangeVals.length?Math.min(...rangeVals):baseMin;
+      let yMax=rangeVals.length?Math.max(...rangeVals):baseMax;
+      const pad=Math.max(field==='humidity'?4:1.5,(yMax-yMin)*.24);yMin=Math.max(field==='humidity'?0:-30,yMin-pad);yMax=Math.min(field==='humidity'?100:60,yMax+pad);
+      if(yMax-yMin<.001){yMin-=1;yMax+=1;}
+      const x=at=>L+(at-from)/(selectedMinutes*60000)*plotW;
+      const y=value=>T+(1-(value-yMin)/(yMax-yMin))*plotH;
+      const escapeText=s=>String(s).replace(/[&<>"']/g,'');
+      let markup=`<defs><linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity=".23"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>`;
+      for(let i=0;i<4;i++){const yi=T+(plotH/3)*i;const val=yMax-(yMax-yMin)*i/3;markup+=`<line class="gridline" x1="${L}" y1="${yi}" x2="${W-R}" y2="${yi}"/><text x="${L-8}" y="${yi+4}" text-anchor="end">${val.toFixed(field==='humidity'?0:1)}</text>`;}
+      for(let i=0;i<4;i++){const at=from+(selectedMinutes*60000)*i/3; const label=new Date(at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});markup+=`<text x="${L+plotW*i/3}" y="${H-7}" text-anchor="${i===0?'start':i===3?'end':'middle'}">${escapeText(label)}</text>`;}
+      if(!values.length)markup+=`<text class="empty" x="${L+plotW/2}" y="${T+plotH/2}" text-anchor="middle">Aguardando leituras ao vivo...</text>`;
+      else {
+        const points=values.map(item=>[Math.max(L,Math.min(W-R,x(item.at))),y(item[field])]);
+        const d=points.map((p,i)=>(i?'L':'M')+p[0].toFixed(2)+','+p[1].toFixed(2)).join(' ');
+        const first=points[0],last=points[points.length-1];
+        const line=points.length===1?`M${L},${first[1]} L${W-R},${first[1]}`:d;
+        const area=`${line} L${last[0]},${T+plotH} L${points.length===1?L:first[0]},${T+plotH} Z`;
+        markup+=`<path d="${area}" fill="url(#${fillId})"/><path class="stroke-line" d="${line}" stroke="${color}"/><circle class="point" cx="${last[0]}" cy="${last[1]}" r="4.5" fill="${color}"/>`;
+      }
+      svg.innerHTML=markup;
+    }
+    function renderCharts(){plot(el.tempChart,'temperature','#64dcf3','tempFade',16,32);plot(el.humidChart,'humidity','#ae9dff','humidFade',40,85);}
+    function parseReading(value,min,max){const num=Number(value.trim());return value.trim()!==''&&Number.isFinite(num)&&num>=min&&num<=max?num:null;}
+    function onMQTTMessage(topic,payload,packet){
+      if(!topic.startsWith(PREFIX))return;
+      const name=topic.slice(PREFIX.length);
+      if(!TOPICS.includes(name))return;
+      const raw=payload.toString().trim(); const retained=Boolean(packet&&packet.retain);
+      if(retained)state.retained=true;
+      const live=!retained;
+      if(name==='temperatura') { const value=parseReading(raw,-40,90);if(value!==null){state.temperature=value;if(live)state.freshAt=Date.now();} }
+      if(name==='umidade'){const value=parseReading(raw,0,100);if(value!==null){state.humidity=value;if(live){state.freshAt=Date.now();addPoint();}}}
+      if(name==='risco'&&['RISCO','SEGURO','ERRO'].includes(raw)){
+        if(raw!==state.risk&&live)addEvent(raw==='RISCO'?'Risco de mofo identificado':raw==='SEGURO'?'Condição voltou a ficar sem alerta':'Erro ao ler o DHT11',raw==='RISCO'?'risk':raw==='SEGURO'?'safe':'warning');
+        state.risk=raw;if(raw==='ERRO')state.device='error';if(live)state.freshAt=Date.now();
+      }
+      if(name==='led_vermelho'&&['ON','OFF'].includes(raw))state.red=raw;
+      if(name==='led_verde'&&['ON','OFF'].includes(raw))state.green=raw;
+      if(name==='status'&&['online','offline'].includes(raw)){
+        if(raw==='offline'&&state.device!=='offline'&&live)addEvent('ESP32-C3 ficou offline','warning');
+        state.device=raw;
+      }
+      if(live&&name!=='status'&&name!=='risco'&&state.device!=='error'&&state.device!=='offline')state.device='online';
+      if(live&&name==='temperatura'&&state.device==='offline')state.device='online';
+      if(live&&name==='umidade'&&state.device==='offline')state.device='online';
+      renderMetrics();
+    }
+    function stopDemo(){if(demoTimer){clearInterval(demoTimer);demoTimer=null;} $('demo-btn').textContent='Testar visual';}
+    function stopMQTT(){if(client){const previous=client;client=null;previous.removeAllListeners();previous.end(true);}setConnection('offline','Desconectado');}
+    function openModal(){el.formStatus.textContent='';el.modal.classList.add('open');setTimeout(()=>el.password.focus(),70);}
+    function closeModal(){el.modal.classList.remove('open');el.password.value='';}
+    function connectMQTT(username,password){
+      stopDemo();stopMQTT();
+      if(typeof window.mqtt?.connect!=='function'){showToast('Não foi possível carregar MQTT.js. Confira a internet.');return;}
+      setConnection('connecting','Conectando...');
+      const random=typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID().slice(0,16):Math.random().toString(16).slice(2);
+      const connection=window.mqtt.connect(WS_URL,{clientId:'mofosense_web_'+random,username,password,clean:true,connectTimeout:12000,reconnectPeriod:4000,keepalive:30});
+      client=connection;
+      // A senha digitada foi retirada do campo; a biblioteca MQTT a mantém somente na memória da sessão.
+      connection.on('connect',()=>{if(client!==connection)return;setConnection('online','Conectado');addEvent('Conectado ao HiveMQ Cloud','safe');connection.subscribe(PREFIX+'#',{qos:0},err=>{if(err){showToast('Conectado, mas a assinatura falhou. Verifique as permissões.');addEvent('Falha na assinatura dos tópicos','warning');}else showToast('Conectado! Aguardando os dados da ESP32-C3.');});});
+      connection.on('message',(topic,payload,packet)=>{if(client===connection)onMQTTMessage(topic,payload,packet);});
+      connection.on('reconnect',()=>{if(client===connection)setConnection('connecting','Reconectando...');});
+      connection.on('offline',()=>{if(client===connection)setConnection('error','Sem conexão');});
+      connection.on('close',()=>{if(client===connection&&state.mode!=='connecting')setConnection('error','Sem conexão');});
+      connection.on('error',err=>{if(client!==connection)return;setConnection('error','Erro de conexão');el.formStatus.textContent='Falha de autenticação, rede ou conexão WebSocket. Confira as credenciais e o broker.';console.warn('Falha MQTT:',err.message);});
+    }
+    $('connect-btn').addEventListener('click',()=>{if(client){stopMQTT();addEvent('Conexão encerrada pelo usuário');showToast('Desconectado do HiveMQ.');}else openModal();});
+    $('close-modal').addEventListener('click',closeModal);
+    el.modal.addEventListener('click',e=>{if(e.target===el.modal)closeModal();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el.modal.classList.contains('open'))closeModal();});
+    el.form.addEventListener('submit',e=>{e.preventDefault();const username=el.username.value.trim(),password=el.password.value;if(!username||!password){el.formStatus.textContent='Informe usuário e senha.';return;}closeModal();connectMQTT(username,password);});
+    function demoSample(){const n=history.length;state.temperature=25.2+Math.sin(n*.37)*2.7+(Math.random()-.5)*.45;state.humidity=65+Math.sin(n*.24)*12+(Math.random()-.5)*2;state.risk=state.humidity>=70||(state.humidity>=65&&state.temperature>=20&&state.temperature<=30)?'RISCO':'SEGURO';state.red=state.risk==='RISCO'?'ON':'OFF';state.green=state.risk==='RISCO'?'OFF':'ON';state.freshAt=Date.now();state.device='online';addPoint();renderMetrics();}
+    $('demo-btn').addEventListener('click',()=>{if(demoTimer){stopDemo();setConnection('offline','Desconectado');addEvent('Demonstração encerrada');return;}if(client)stopMQTT();state.temperature=null;state.humidity=null;state.risk=null;state.red=null;state.green=null;state.freshAt=null;history=[];setConnection('demo','Modo demonstração');$('demo-btn').textContent='Parar teste';addEvent('Modo demonstração iniciado — dados fictícios','warning');demoSample();demoTimer=setInterval(demoSample,4000);showToast('Modo demonstração: os dados são fictícios.');});
+    document.querySelectorAll('[data-minutes]').forEach(btn=>btn.addEventListener('click',()=>{selectedMinutes=Number(btn.dataset.minutes);document.querySelectorAll('[data-minutes]').forEach(b=>b.classList.toggle('selected',b===btn));renderCharts();}));
+    $('clear-btn').addEventListener('click',()=>{history=[];renderCharts();addEvent('Histórico visual limpo');showToast('Gráficos limpos. Novas leituras aparecerão automaticamente.');});
+    $('export-btn').addEventListener('click',()=>{if(!history.length){showToast('Ainda não há leituras ao vivo para exportar.');return;}const csv='\uFEFFdata_hora;temperatura_c;umidade_pct\r\n'+history.map(p=>`${new Date(p.at).toISOString()};${p.temperature.toFixed(2).replace('.',',')};${p.humidity.toFixed(2).replace('.',',')}`).join('\r\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='mofosense-leituras.csv';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+    // Valores retidos não têm horário de coleta; não são registrados no histórico como leituras novas.
+    setInterval(()=>{refreshDevice();if(state.connected&&state.freshAt!==null&&Date.now()-state.freshAt>30000&&state.device!=='offline'&&state.device!=='error')el.deviceBadge.textContent='Sem dados recentes';},5000);
+    renderMetrics();renderCharts();
+  })();
+  </script>
+</body>
+</html>
