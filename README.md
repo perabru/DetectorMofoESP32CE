@@ -1,8 +1,4 @@
-Segue o README.md completo, pronto para copiar e colar no seu repositório do GitHub. Incluí o modelo da ESP32-C3, pinagem, instalação dos drivers, comunicação MQTT, configuração do HiveMQ Cloud, funcionamento dos LEDs e instruções para publicar o dashboard no GitHub Pages.
 
-Markdown
-
-````
 # 🍄 MofoSense — Monitoramento Inteligente de Risco de Mofo
 
 ![ESP32](https://img.shields.io/badge/ESP32--C3-E7352C?style=for-the-badge&logo=espressif&logoColor=white)
