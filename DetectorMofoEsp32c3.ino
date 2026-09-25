@@ -1,4 +1,3 @@
-
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <PubSubClient.h>
@@ -12,6 +11,7 @@
 #define PINO_DHT 10
 #define PINO_LED_VERMELHO 3
 #define PINO_LED_VERDE 2
+#define PINO_LED_RISCO 0       // NOVO LED NO D0 / GPIO0
 
 #define TIPO_DHT DHT11
 
@@ -55,12 +55,15 @@ const char* TOPICO_LED_VERMELHO =
 const char* TOPICO_LED_VERDE =
   "perabru/mofo/led_verde";
 
+// NOVO TOPICO
+const char* TOPICO_LED_RISCO =
+  "perabru/mofo/led_risco";
+
 const char* TOPICO_STATUS =
   "perabru/mofo/status";
 
 // =====================================
 // 5. CERTIFICADO TLS
-// ISRG Root X1 - Let's Encrypt
 // =====================================
 
 static const char ROOT_CA[] = R"EOF(
@@ -107,7 +110,7 @@ PubSubClient mqtt(wifiSeguro);
 String mqttClientId;
 
 // =====================================
-// 7. CONFIGURACAO DOS LIMITES
+// 7. LIMITES
 // =====================================
 
 const float UMIDADE_ALTA = 70.0;
@@ -116,10 +119,7 @@ const float UMIDADE_MODERADA = 65.0;
 const float TEMP_MIN = 20.0;
 const float TEMP_MAX = 30.0;
 
-// Intervalo das leituras: 5 segundos
 const unsigned long INTERVALO_LEITURA = 5000;
-
-// Intervalo de reconexao: 5 segundos
 const unsigned long INTERVALO_RECONEXAO = 5000;
 
 unsigned long ultimaLeitura = 0;
@@ -135,9 +135,7 @@ void conectarWiFi() {
   Serial.println("Conectando ao Wi-Fi...");
 
   WiFi.mode(WIFI_STA);
-
   WiFi.begin(WIFI_SSID, WIFI_SENHA);
-
 }
 
 // =====================================
@@ -154,8 +152,6 @@ void conectarMQTT() {
     return;
   }
 
-  // Aguarda o relogio estar sincronizado.
-  // Necessario para validar o certificado TLS.
   if (time(nullptr) < 1700000000) {
     Serial.println("Aguardando sincronizacao NTP...");
     return;
@@ -163,8 +159,6 @@ void conectarMQTT() {
 
   Serial.println("Conectando ao HiveMQ Cloud...");
 
-  // O ultimo argumento configura a mensagem
-  // de ultimo desejo (Last Will).
   bool conectado = mqtt.connect(
     mqttClientId.c_str(),
     MQTT_USUARIO,
@@ -179,27 +173,24 @@ void conectarMQTT() {
 
     Serial.println("HiveMQ conectado!");
 
-    // Publicacao retida do estado online
     mqtt.publish(
       TOPICO_STATUS,
       "online",
       true
     );
 
-    // Forca uma nova leitura apos reconectar
-    ultimaLeitura = millis() - INTERVALO_LEITURA;
+    ultimaLeitura =
+      millis() - INTERVALO_LEITURA;
 
   } else {
 
     Serial.print("Erro MQTT. Codigo: ");
     Serial.println(mqtt.state());
-
   }
-
 }
 
 // =====================================
-// 10. PUBLICAR DADOS NO HIVEMQ
+// 10. PUBLICAR DADOS
 // =====================================
 
 void publicarDados(
@@ -209,13 +200,17 @@ void publicarDados(
 ) {
 
   if (!mqtt.connected()) {
-    Serial.println("MQTT desconectado. Dados nao enviados.");
+    Serial.println(
+      "MQTT desconectado. Dados nao enviados."
+    );
     return;
   }
 
-  // Converte valores para texto
-  String tempTexto = String(temperatura, 2);
-  String umidTexto = String(umidade, 2);
+  String tempTexto =
+    String(temperatura, 2);
+
+  String umidTexto =
+    String(umidade, 2);
 
   const char* estadoRisco =
     riscoMofo ? "RISCO" : "SEGURO";
@@ -226,43 +221,50 @@ void publicarDados(
   const char* estadoVerde =
     riscoMofo ? "OFF" : "ON";
 
-  // Publicar temperatura
+  // NOVO
+  const char* estadoLedRisco =
+    riscoMofo ? "ON" : "OFF";
+
   mqtt.publish(
     TOPICO_TEMPERATURA,
     tempTexto.c_str(),
     true
   );
 
-  // Publicar umidade
   mqtt.publish(
     TOPICO_UMIDADE,
     umidTexto.c_str(),
     true
   );
 
-  // Publicar classificacao
   mqtt.publish(
     TOPICO_RISCO,
     estadoRisco,
     true
   );
 
-  // Publicar estado do LED vermelho
   mqtt.publish(
     TOPICO_LED_VERMELHO,
     estadoVermelho,
     true
   );
 
-  // Publicar estado do LED verde
   mqtt.publish(
     TOPICO_LED_VERDE,
     estadoVerde,
     true
   );
 
-  Serial.println("Dados publicados no HiveMQ!");
+  // NOVO
+  mqtt.publish(
+    TOPICO_LED_RISCO,
+    estadoLedRisco,
+    true
+  );
 
+  Serial.println(
+    "Dados publicados no HiveMQ!"
+  );
 }
 
 // =====================================
@@ -273,11 +275,37 @@ void setup() {
 
   Serial.begin(115200);
 
-  pinMode(PINO_LED_VERMELHO, OUTPUT);
-  pinMode(PINO_LED_VERDE, OUTPUT);
+  pinMode(
+    PINO_LED_VERMELHO,
+    OUTPUT
+  );
 
-  digitalWrite(PINO_LED_VERMELHO, LOW);
-  digitalWrite(PINO_LED_VERDE, LOW);
+  pinMode(
+    PINO_LED_VERDE,
+    OUTPUT
+  );
+
+  // NOVO
+  pinMode(
+    PINO_LED_RISCO,
+    OUTPUT
+  );
+
+  digitalWrite(
+    PINO_LED_VERMELHO,
+    LOW
+  );
+
+  digitalWrite(
+    PINO_LED_VERDE,
+    LOW
+  );
+
+  // NOVO
+  digitalWrite(
+    PINO_LED_RISCO,
+    LOW
+  );
 
   dht.begin();
 
@@ -289,7 +317,6 @@ void setup() {
 
   conectarWiFi();
 
-  // Sincroniza a hora via internet
   configTime(
     0,
     0,
@@ -297,25 +324,25 @@ void setup() {
     "time.google.com"
   );
 
-  // Configura TLS com validacao de certificado
   wifiSeguro.setCACert(ROOT_CA);
 
-  // Configura servidor MQTT
   mqtt.setServer(
     MQTT_SERVIDOR,
     MQTT_PORTA
   );
 
-  // Identificador unico por ESP32
-  mqttClientId = "ESP32C3-MOFO-" +
-    String((uint32_t)ESP.getEfuseMac(), HEX);
+  mqttClientId =
+    "ESP32C3-MOFO-" +
+    String(
+      (uint32_t)ESP.getEfuseMac(),
+      HEX
+    );
 
   Serial.print("Cliente MQTT: ");
   Serial.println(mqttClientId);
 
-  // Primeira leitura imediata
-  ultimaLeitura = millis() - INTERVALO_LEITURA;
-
+  ultimaLeitura =
+    millis() - INTERVALO_LEITURA;
 }
 
 // =====================================
@@ -327,53 +354,57 @@ void loop() {
   unsigned long agora = millis();
 
   // ---------------------------------
-  // VERIFICAR WI-FI
+  // WI-FI
   // ---------------------------------
 
   if (WiFi.status() != WL_CONNECTED) {
 
-    if (agora - ultimaTentativaWiFi >=
-        INTERVALO_RECONEXAO) {
+    if (
+      agora - ultimaTentativaWiFi >=
+      INTERVALO_RECONEXAO
+    ) {
 
       ultimaTentativaWiFi = agora;
 
-      Serial.println("Wi-Fi desconectado.");
+      Serial.println(
+        "Wi-Fi desconectado."
+      );
 
       conectarWiFi();
-
     }
 
   } else {
 
     // ---------------------------------
-    // VERIFICAR MQTT
+    // MQTT
     // ---------------------------------
 
     if (!mqtt.connected()) {
 
-      if (agora - ultimaTentativaMQTT >=
-          INTERVALO_RECONEXAO) {
+      if (
+        agora - ultimaTentativaMQTT >=
+        INTERVALO_RECONEXAO
+      ) {
 
         ultimaTentativaMQTT = agora;
 
         conectarMQTT();
-
       }
 
     } else {
 
       mqtt.loop();
-
     }
-
   }
 
   // ---------------------------------
-  // LER SENSOR A CADA 5 SEGUNDOS
+  // LEITURA
   // ---------------------------------
 
-  if (agora - ultimaLeitura >=
-      INTERVALO_LEITURA) {
+  if (
+    agora - ultimaLeitura >=
+    INTERVALO_LEITURA
+  ) {
 
     ultimaLeitura = agora;
 
@@ -384,13 +415,17 @@ void loop() {
       dht.readHumidity();
 
     // ---------------------------------
-    // VALIDAR LEITURAS
+    // ERRO DO SENSOR
     // ---------------------------------
 
-    if (isnan(temperatura) ||
-        isnan(umidade)) {
+    if (
+      isnan(temperatura) ||
+      isnan(umidade)
+    ) {
 
-      Serial.println("Erro ao ler DHT11!");
+      Serial.println(
+        "Erro ao ler DHT11!"
+      );
 
       digitalWrite(
         PINO_LED_VERMELHO,
@@ -399,6 +434,12 @@ void loop() {
 
       digitalWrite(
         PINO_LED_VERDE,
+        LOW
+      );
+
+      // NOVO
+      digitalWrite(
+        PINO_LED_RISCO,
         LOW
       );
 
@@ -422,16 +463,24 @@ void loop() {
           true
         );
 
+        // NOVO
+        mqtt.publish(
+          TOPICO_LED_RISCO,
+          "OFF",
+          true
+        );
       }
 
       return;
     }
 
     // ---------------------------------
-    // MOSTRAR TEMPERATURA E UMIDADE
+    // MOSTRAR LEITURAS
     // ---------------------------------
 
-    Serial.println("----------------------------");
+    Serial.println(
+      "----------------------------"
+    );
 
     Serial.print("Temperatura: ");
     Serial.print(temperatura);
@@ -442,7 +491,7 @@ void loop() {
     Serial.println(" %");
 
     // ---------------------------------
-    // CALCULAR RISCO DE MOFO
+    // CALCULAR RISCO
     // ---------------------------------
 
     bool riscoMofo = false;
@@ -451,16 +500,13 @@ void loop() {
 
       riscoMofo = true;
 
-    }
-
-    else if (
+    } else if (
       umidade >= UMIDADE_MODERADA &&
       temperatura >= TEMP_MIN &&
       temperatura <= TEMP_MAX
     ) {
 
       riscoMofo = true;
-
     }
 
     // ---------------------------------
@@ -479,8 +525,23 @@ void loop() {
         LOW
       );
 
-      Serial.println("ALERTA: RISCO DE MOFO!");
-      Serial.println("LED VERMELHO ACESO");
+      // NOVO LED D0
+      digitalWrite(
+        PINO_LED_RISCO,
+        HIGH
+      );
+
+      Serial.println(
+        "ALERTA: RISCO DE MOFO!"
+      );
+
+      Serial.println(
+        "LED VERMELHO ACESO"
+      );
+
+      Serial.println(
+        "LED DE RISCO D0 ACESO"
+      );
 
     } else {
 
@@ -494,13 +555,27 @@ void loop() {
         HIGH
       );
 
-      Serial.println("AMBIENTE SEM ALERTA");
-      Serial.println("LED VERDE ACESO");
+      // NOVO LED D0
+      digitalWrite(
+        PINO_LED_RISCO,
+        LOW
+      );
 
+      Serial.println(
+        "AMBIENTE SEM ALERTA"
+      );
+
+      Serial.println(
+        "LED VERDE ACESO"
+      );
+
+      Serial.println(
+        "LED DE RISCO D0 APAGADO"
+      );
     }
 
     // ---------------------------------
-    // ENVIAR DADOS PARA HIVEMQ
+    // ENVIAR PARA HIVEMQ
     // ---------------------------------
 
     publicarDados(
@@ -508,7 +583,5 @@ void loop() {
       umidade,
       riscoMofo
     );
-
   }
-
 }
